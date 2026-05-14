@@ -1,0 +1,480 @@
+﻿<!DOCTYPE html>   
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root { --primary: #2196F3; --danger: #f44336; --success: #4CAF50; --bg: #eeeeee; --text: #212121; --tab-bg: #e0e0e0; }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: var(--bg); 
+            margin: 0; 
+            display: flex; 
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden; 
+        }
+
+
+        .container { 
+            background: white; 
+            width: 100%; 
+            max-width: 500px; 
+            display: flex;
+            flex-direction: column; 
+            box-shadow: 0 0 10px rgba(0,0,0,0.1); 
+        }
+
+
+        .header-box {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 2px solid var(--primary);
+            padding: 15px 20px;
+            background: white;
+            z-index: 10;
+        }
+
+
+        .tab-nav {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            background: var(--tab-bg);
+            padding: 4px;
+            gap: 4px;
+        }
+
+
+        .tab-btn {
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-weight: bold;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+
+        .tab-active {
+            background: white;
+            color: var(--primary);
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h2 { margin: 0; color: var(--text); font-size: 1.2rem; }
+
+
+        #records-container {
+            flex: 1; 
+            overflow-y: auto; 
+            padding: 0 10px;
+        }
+
+
+        .view { display: none; height: 100%; flex-direction: column; }
+        .active { display: flex; animation: fadeIn 0.3s; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+
+        .btn-small { padding: 8px 12px; font-size: 0.75rem; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; text-transform: uppercase; }
+        .btn-add-small { background: var(--primary); color: white; }
+        .btn-save-small { background: var(--success); color: white; }
+        .btn-delete-small { background: var(--danger); color: white; }
+        .btn-cancel-small { background: #757575; color: white; }
+
+
+        .record-item { 
+            display: grid;
+            grid-template-columns: 1fr auto;
+            padding: 18px; 
+            border-bottom: 1px solid #ddd; 
+            cursor: pointer; 
+            font-size: 1.1rem;
+            align-items: center;
+        }
+
+
+        .input-area { padding: 20px; overflow-y: auto; }
+        input, textarea, select { width: 100%; padding: 15px; margin: 10px 0; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; font-family: inherit; background: white; }
+        .label-hint { font-size: 0.8rem; color: #666; margin-bottom: -5px; display: block; font-weight: bold; }
+
+
+        .context-records, .context-tv-shows { display: none; }
+        .mode-records .context-records { display: block; }
+        .mode-tv-shows .context-tv-shows { display: block; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="mode-records">
+
+
+<div class="container">
+    <div id="view-list" class="view active">
+        <div class="header-box">
+            <h2 id="list-title">Records</h2>
+            <button class="btn-small btn-cancel-small" onclick="exportData()">Backup</button>
+            <button class="btn-small btn-add-small" id="main-add-btn" onclick="showView('view-input')">+ Add</button>
+        </div>
+        
+        <div class="tab-nav">
+            <div id="tab-records" class="tab-btn tab-active" onclick="switchTable('records')">People</div>
+            <div id="tab-tv-shows" class="tab-btn" onclick="switchTable('tv-shows')">TV Shows</div>
+        </div>
+
+
+        <div id="records-container"></div>
+    </div>
+
+
+    <div id="view-input" class="view">
+        <div class="header-box">
+            <h2 id="input-title">New Entry</h2>
+            <button class="btn-small btn-cancel-small" onclick="showView('view-list')">Cancel</button>
+            <button class="btn-small btn-save-small" onclick="addEntry()">Save</button>
+        </div>
+        <div class="input-area">
+            <div class="context-records">
+                <label class="label-hint">Full Name</label>
+                <input type="text" id="in-name">
+                <label class="label-hint">Age</label>
+                <input type="number" id="in-age" inputmode="numeric">
+            </div>
+            <div class="context-tv-shows">
+                <label class="label-hint">Series Title</label>
+                <input type="text" id="in-series">
+                <label class="label-hint">Streamer</label>
+                <select id="in-streamer" onchange="handleNewStreamer(this)">
+                    <option value="">Select Streamer...</option>
+                    <option value="Netflix">Netflix</option>
+                    <option value="Prime">Prime</option>
+                    <option value="Peacock">Peacock</option>
+                    <option value="Paramount">Paramount</option>
+                    <option value="Hulu">Hulu</option>
+                    <option value="Disney">Disney</option>
+                    <option value="Apple">Apple</option>
+                    <option value="ADD_NEW" style="font-weight: bold; color: var(--primary);">+ Add New Streamer</option>
+                </select>
+                <label class="label-hint">Location</label>
+                <input type="text" id="in-location" placeholder="e.g.Hammond">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label class="label-hint">Seasons</label>
+                        <input type="number" id="in-seasons" inputmode="numeric">
+                    </div>
+                    <div>
+                        <label class="label-hint">Episodes</label>
+                        <input type="number" id="in-episodes" inputmode="numeric">
+                    </div>
+                </div>
+                <label class="label-hint">Comments</label>
+                <textarea id="in-comments" rows="3"></textarea>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="view-edit" class="view">
+        <div class="header-box">
+            <h2>Edit</h2>
+            <button class="btn-small btn-delete-small" onclick="deleteEntry()">Delete</button>
+            <button class="btn-small btn-save-small" onclick="updateEntry()">Update</button>
+        </div>
+        <div class="input-area">
+            <input type="hidden" id="edit-id">
+            
+            <div class="context-records">
+                <label class="label-hint">Name</label>
+                <input type="text" id="edit-name">
+                <label class="label-hint">Age</label>
+                <input type="number" id="edit-age" inputmode="numeric">
+            </div>
+
+
+            <div class="context-tv-shows">
+                <label class="label-hint">Series Title</label>
+                <input type="text" id="edit-series">
+                <label class="label-hint">Streamer</label>
+                <select id="edit-streamer" onchange="handleNewStreamer(this)">
+                    <option value="">Select Streamer...</option>
+                    <option value="Netflix">Netflix</option>
+                    <option value="Prime">Prime</option>
+                    <option value="Peacock">Peacock</option>
+                    <option value="Paramount">Paramount</option>
+                    <option value="Hulu">Hulu</option>
+                    <option value="Disney">Disney</option>
+                    <option value="Apple">Apple</option>
+                    <option value="ADD_NEW" style="font-weight: bold; color: var(--primary);">+ Add New Streamer</option>
+                </select>
+                <label class="label-hint">Location</label>
+                <input type="text" id="edit-location">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label class="label-hint">Seasons</label>
+                        <input type="number" id="edit-seasons" inputmode="numeric">
+                    </div>
+                    <div>
+                        <label class="label-hint">Episodes</label>
+                        <input type="number" id="edit-episodes" inputmode="numeric">
+                    </div>
+                </div>
+                <label class="label-hint">Comments</label>
+                <textarea id="edit-comments" rows="3"></textarea>
+            </div>
+
+
+            <button class="btn-small btn-cancel-small" style="width:100%; margin-top:20px; padding:15px" onclick="showView('view-list')">Back to List</button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    const SUPABASE_URL = 'https://jyxzjppujqnvtzfcssyj.supabase.co'; 
+    const SUPABASE_KEY = 'sb_publishable_gpsrWElVPKKiv40-37X9Tg_WUUcZ6kD';
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+
+    let currentData = [];
+    let currentTable = 'records'; 
+
+
+    function handleNewStreamer(selectElement) {
+        if (selectElement.value === "ADD_NEW") {
+            const newName = prompt("Enter the name of the new streaming service:");
+            if (newName && newName.trim().length > 0) {
+                const cleanName = newName.trim();
+                ['in-streamer', 'edit-streamer'].forEach(id => {
+                    const el = document.getElementById(id);
+                    const opt = document.createElement('option');
+                    opt.value = cleanName;
+                    opt.textContent = cleanName;
+                    el.insertBefore(opt, el.lastElementChild);
+                });
+                selectElement.value = cleanName;
+            } else {
+                selectElement.value = "";
+            }
+        }
+    }
+
+
+    function ensureStreamerExists(selectId, value) {
+        const select = document.getElementById(selectId);
+        if (!value) {
+            select.value = "";
+            return;
+        }
+        let exists = false;
+        for (let i = 0; i < select.options.length; i++) {
+            if (select.options[i].value === value) {
+                exists = true;
+                break;
+            }
+        }
+        if (!exists) {
+            const opt = document.createElement('option');
+            opt.value = value;
+            opt.textContent = value;
+            select.insertBefore(opt, select.lastElementChild);
+        }
+        select.value = value;
+    }
+
+
+    async function fetchData(force = false) {
+        const btnAdd = document.getElementById('main-add-btn');
+        if (btnAdd) {
+            btnAdd.innerText = "..."; 
+            btnAdd.disabled = true;
+        }
+
+
+        // DYNAMIC SORTING LOGIC
+        // Using 'series' for TV shows as confirmed
+        const sortColumn = currentTable === 'records' ? 'name' : 'series';
+
+
+        try {
+            const { data, error } = await supabaseClient
+                .from(currentTable)
+                .select('*')
+                .order(sortColumn, { ascending: true }); // Alphabetical
+
+
+            if (error) {
+                // This alert will reveal if a column name is wrong
+                alert("Error: " + error.message + " (Table: " + currentTable + ", Column: " + sortColumn + ")");
+                console.error(error);
+            } else {
+                currentData = data;
+                renderList();
+            }
+        } catch (err) {
+            alert("App Error: " + err.message);
+        }
+
+
+        if (btnAdd) {
+            btnAdd.innerText = "+ Add";
+            btnAdd.disabled = false;
+        }
+    }
+
+
+    function renderList() {
+        const container = document.getElementById('records-container');
+        container.innerHTML = currentData.length ? '' : '<p style="text-align:center; padding: 20px; color: #999;">No records found.</p>';
+        
+        currentData.forEach((item) => {
+            const div = document.createElement('div');
+            div.className = 'record-item';
+            
+            if (currentTable === 'records') {
+                div.innerHTML = `<span>${item.name || 'No Name'}</span> <span style="color:#666">Age: ${item.age || 0}</span>`;
+            } else {
+                div.innerHTML = `<span>${item.series || 'Untitled'}</span>`;
+                div.style.gridTemplateColumns = "1fr";
+            }
+            
+            div.onclick = () => openEditView(item);
+            container.appendChild(div);
+        });
+    }
+
+
+    function switchTable(tableName) {
+        currentTable = tableName;
+        document.body.className = `mode-${tableName}`;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+        document.getElementById(`tab-${tableName}`).classList.add('tab-active');
+        document.getElementById('list-title').innerText = tableName === 'records' ? 'Records' : 'TV Shows';
+        fetchData(true);
+    }
+
+
+    function showView(viewId) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById(viewId).classList.add('active');
+    }
+
+
+    async function addEntry() {
+        let payload = {};
+        if (currentTable === 'records') {
+            payload = { 
+                name: document.getElementById('in-name').value.trim(), 
+                age: parseInt(document.getElementById('in-age').value) || 0 
+            };
+        } else {
+            payload = { 
+                series: document.getElementById('in-series').value.trim(), 
+                streamer: document.getElementById('in-streamer').value,
+                location: document.getElementById('in-location').value.trim(),
+                seasons: parseInt(document.getElementById('in-seasons').value) || 0,
+                episodes: parseInt(document.getElementById('in-episodes').value) || 0,
+                comments: document.getElementById('in-comments').value.trim()
+            };
+        }
+
+
+        const { error } = await supabaseClient.from(currentTable).insert([payload]);
+        if (!error) {
+            clearInputs();
+            await fetchData(true); 
+            showView('view-list');
+        } else {
+            alert("Error saving: " + error.message);
+        }
+    }
+
+
+    function openEditView(item) {
+        document.getElementById('edit-id').value = item.id;
+        if (currentTable === 'records') {
+            document.getElementById('edit-name').value = item.name || '';
+            document.getElementById('edit-age').value = item.age || '';
+        } else {
+            document.getElementById('edit-series').value = item.series || '';
+            ensureStreamerExists('edit-streamer', item.streamer);
+            document.getElementById('edit-location').value = item.location || '';
+            document.getElementById('edit-seasons').value = item.seasons || '';
+            document.getElementById('edit-episodes').value = item.episodes || '';
+            document.getElementById('edit-comments').value = item.comments || '';
+        }
+        showView('view-edit');
+    }
+
+
+    async function updateEntry() {
+        const id = document.getElementById('edit-id').value;
+        let payload = {};
+        
+        if (currentTable === 'records') {
+            payload = { 
+                name: document.getElementById('edit-name').value.trim(), 
+                age: parseInt(document.getElementById('edit-age').value) || 0 
+            };
+        } else {
+            payload = { 
+                series: document.getElementById('edit-series').value.trim(), 
+                streamer: document.getElementById('edit-streamer').value,
+                location: document.getElementById('edit-location').value.trim(),
+                seasons: parseInt(document.getElementById('edit-seasons').value) || 0,
+                episodes: parseInt(document.getElementById('edit-episodes').value) || 0,
+                comments: document.getElementById('edit-comments').value.trim()
+            };
+        }
+
+
+        const { error } = await supabaseClient.from(currentTable).update(payload).eq('id', id);
+        if (!error) {
+            await fetchData(true); 
+            showView('view-list');
+        }
+    }
+
+
+    async function deleteEntry() {
+        const id = document.getElementById('edit-id').value;
+        if(confirm("Delete this entry?")) {
+            const { error } = await supabaseClient.from(currentTable).delete().eq('id', id);
+            if (!error) {
+                await fetchData(true); 
+                showView('view-list');
+            }
+        }
+    }
+
+
+    function clearInputs() {
+        const ids = ['in-name', 'in-age', 'in-series', 'in-streamer', 'in-seasons', 'in-episodes', 'in-comments', 'in-location'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.value = '';
+        });
+    }
+
+
+    function exportData() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(currentData, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `${currentTable}_backup.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+
+
+    fetchData(true);
+</script>
+
+
+</body>
+</html>
